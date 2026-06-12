@@ -1,6 +1,10 @@
 # Logovi s osobnim diktatima
 diktat/diktat.log
 
+# PyInstaller artifacts
+diktat/build/
+diktat/dist/
+
 # Python cache
 __pycache__/
 *.pyc

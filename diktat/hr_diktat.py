@@ -72,7 +72,11 @@ REPLACEMENTS = {
 }
 # ===========================================================================
 
-BASE_DIR    = os.path.dirname(os.path.abspath(__file__))
+# U frozen (PyInstaller) modu log ide pokraj .exe-a; inace pokraj skripte.
+if getattr(sys, "frozen", False):
+    BASE_DIR = os.path.dirname(sys.executable)
+else:
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LOG_FILE    = os.path.join(BASE_DIR, "diktat.log")
 LOG_MAX_MB  = 10   # kad log naraste iznad ovoga, stari se arhivira u diktat.log.1
 
@@ -112,10 +116,15 @@ if ctypes.windll.kernel32.GetLastError() == 183:  # ERROR_ALREADY_EXISTS
 
 # --- NVIDIA DLL-ovi iz pip wheelova (cublas/cudnn) za GPU mod -------------------
 def _add_nvidia_dlls():
-    import sysconfig
-    sp = sysconfig.get_paths()["purelib"]
+    # Frozen: DLL-ovi su bundlani u _MEIPASS (nvidia\...\bin); inace su u
+    # site-packages (pip wheelovi).
+    if getattr(sys, "frozen", False):
+        base = sys._MEIPASS
+    else:
+        import sysconfig
+        base = sysconfig.get_paths()["purelib"]
     for sub in (r"nvidia\cublas\bin", r"nvidia\cudnn\bin"):
-        p = os.path.join(sp, sub)
+        p = os.path.join(base, sub)
         if os.path.isdir(p):
             os.add_dll_directory(p)
             os.environ["PATH"] = p + os.pathsep + os.environ["PATH"]
@@ -273,15 +282,35 @@ def fix_terms(text):
     return text
 
 def audio_callback(indata, frames, t, status):
+    if status:
+        log(f"[!] Audio stream status: {status}")
     if recording:
         with lock:
             chunks.append(indata.copy())
 
-stream = sd.InputStream(
-    samplerate=SAMPLE_RATE, channels=1, dtype="float32",
-    callback=audio_callback, blocksize=1024, device=AUDIO_DEVICE,
-)
-stream.start()
+def _open_stream():
+    s = sd.InputStream(
+        samplerate=SAMPLE_RATE, channels=1, dtype="float32",
+        callback=audio_callback, blocksize=1024, device=AUDIO_DEVICE,
+    )
+    s.start()
+    return s
+
+stream = _open_stream()
+
+def _restart_stream():
+    global stream, AUDIO_DEVICE
+    try:
+        stream.stop()
+        stream.close()
+    except Exception:
+        pass
+    AUDIO_DEVICE = pick_device(MIC_NAME)
+    try:
+        stream = _open_stream()
+        log("[i] Audio stream restartan.")
+    except Exception as e:
+        log(f"[!] Restart streama nije uspio: {e}")
 
 def beep(freq=880, dur=120):
     try:
@@ -295,7 +324,8 @@ def transcribe_and_paste():
     global transcribing
     with lock:
         if not chunks:
-            log("[!] Nema audija.")
+            log("[!] Nema audija - restartiram audio stream...")
+            threading.Thread(target=_restart_stream, daemon=True).start()
             return
         audio = np.concatenate(chunks).flatten()
         chunks.clear()

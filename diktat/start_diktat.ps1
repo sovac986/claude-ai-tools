@@ -1,5 +1,4 @@
-# Pokrece hr_diktat servis nevidljivo u pozadini (singleton mutex u skripti
-# sprjecava duplikate, pa je sigurno zvati ovo vise puta).
+# Pokrece hr_diktat servis (singleton - sigurno zvati vise puta).
+# EXE je u dist\hr_diktat\ - tray ikona za gasenje (desni klik -> Izlaz).
 Start-Process -WindowStyle Hidden `
-    -FilePath "C:\Users\Franjo\AppData\Local\Programs\Python\Python313\pythonw.exe" `
-    -ArgumentList "D:\ClaudeAI\tools\diktat\hr_diktat.py"
+    -FilePath "D:\ClaudeAI\tools\diktat\dist\hr_diktat\hr_diktat.exe"

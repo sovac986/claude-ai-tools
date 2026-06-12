@@ -1,0 +1,13 @@
+# Logovi s osobnim diktatima
+diktat/diktat.log
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Claude Code interni fajlovi
+.claude/
+
+# Whisper model cache (preuzima se automatski)
+# ~/.cache/huggingface/ je van ovog foldera, nema ga commitirati

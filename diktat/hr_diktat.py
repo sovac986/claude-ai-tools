@@ -72,21 +72,37 @@ REPLACEMENTS = {
 }
 # ===========================================================================
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-LOG_FILE = os.path.join(BASE_DIR, "diktat.log")
+BASE_DIR    = os.path.dirname(os.path.abspath(__file__))
+LOG_FILE    = os.path.join(BASE_DIR, "diktat.log")
+LOG_MAX_MB  = 10   # kad log naraste iznad ovoga, stari se arhivira u diktat.log.1
+
+def _rotate_log():
+    try:
+        if os.path.getsize(LOG_FILE) > LOG_MAX_MB * 1024 * 1024:
+            backup = LOG_FILE + ".1"
+            if os.path.exists(backup):
+                os.remove(backup)
+            os.rename(LOG_FILE, backup)
+    except Exception:
+        pass
 
 def log(msg):
     line = f"[{datetime.now():%Y-%m-%d %H:%M:%S}] {msg}"
     try:
+        _rotate_log()
         with open(LOG_FILE, "a", encoding="utf-8") as f:
             f.write(line + "\n")
     except Exception:
         pass
     if sys.stdout is not None:
         try:
-            print(line)
+            sys.stdout.buffer.write((line + "\n").encode("utf-8"))
+            sys.stdout.buffer.flush()
         except Exception:
-            pass
+            try:
+                print(line)
+            except Exception:
+                pass
 
 # --- Singleton guard (SessionStart hook moze opaliti iz vise sesija) ----------
 _mutex = ctypes.windll.kernel32.CreateMutexW(None, False, "hr_diktat_singleton")
@@ -301,7 +317,7 @@ def transcribe_and_paste():
             beam_size=5,
             initial_prompt=INITIAL_PROMPT,
             vad_filter=True,
-            vad_parameters=dict(min_silence_duration_ms=500),
+            vad_parameters=dict(threshold=0.2, min_silence_duration_ms=500),
         )
         text = fix_terms(" ".join(s.text.strip() for s in segments).strip())
         elapsed = time.time() - t0
